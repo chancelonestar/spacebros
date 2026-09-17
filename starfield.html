@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceBros — Starfield</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #050510; }
+        canvas { display: block; position: fixed; top: 0; left: 0; }
+    </style>
+</head>
+<body>
+    <canvas id="starfield"></canvas>
+    <script>
+        // ── Star class ──────────────────────────────────────────────
+        class Star {
+            constructor(x, y, layer) {
+                this.x  = x;
+                this.y  = y;
+                this.layer = layer; // 0=slow/deep, 1=mid, 2=fast/close
+                const configs = [
+                    { speed: [0.15, 0.45], size: [0.6, 1.2], alpha: [0.35, 0.7], color: ['#a8c4ff','#c8d8ff','#e8f0ff'] },   // far  – cool white/blue
+                    { speed: [0.5, 1.1],   size: [1.0, 1.8], alpha: [0.55, 0.9], color: ['#e8f0ff','#ffffff','#d0d8ff','#ffe9c8'] }, // mid  – white + occasional warm
+                    { speed: [1.2, 2.4],   size: [1.4, 3.0], alpha: [0.7, 1.0],  color: ['#ffffff','#ffe9c8','#ffd9a0','#e8f0ff'] }   // near – bright white + warm anchors
+                ];
+                const cfg = configs[layer];
+                this.speed    = cfg.speed[0] + Math.random() * (cfg.speed[1] - cfg.speed[0]);
+                this.size     = cfg.size[0]  + Math.random() * (cfg.size[1]  - cfg.size[0]);
+                this.baseAlpha = cfg.alpha[0] + Math.random() * (cfg.alpha[1] - cfg.alpha[0]);
+                this.alpha    = this.baseAlpha;
+                this.color    = cfg.color[Math.floor(Math.random() * cfg.color.length)];
+                this.twinkleSpeed = 0.008 + Math.random() * 0.025;
+                this.twinklePhase  = Math.random() * Math.PI * 2;
+                this.twinkleAmp    = 0.15 + Math.random() * 0.35; // how much it flickers
+            }
+
+            update(dt, width, height) {
+                this.y += this.speed * dt * 0.06;
+                if (this.y > height + this.size) {
+                    this.y = -this.size;
+                    this.x = Math.random() * width;
+                    this.twinklePhase = Math.random() * Math.PI * 2;
+                }
+                this.alpha = this.baseAlpha * (1 - this.twinkleAmp * 0.5)
+                             + this.baseAlpha * this.twinkleAmp * 0.5 * Math.sin(this.twinklePhase + performance.now() * this.twinkleSpeed);
+                this.alpha = Math.max(0.08, Math.min(1, this.alpha));
+            }
+
+            draw(ctx) {
+                const a = this.alpha;
+                ctx.globalAlpha = a;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                // tiny core highlight on the brighter stars
+                if (this.size > 2.0 && a > 0.6) {
+                    ctx.globalAlpha = a * 0.5;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(this.x - 0.5, this.y - 0.5, this.size * 0.4, this.size * 0.4);
+                }
+            }
+        }
+
+        // ── Nebula washes (subtle background blobs) ────────────────
+        class Nebula {
+            constructor(w, h) {
+                this.centers = [
+                    { x: w * 0.2,  y: h * 0.3, r: Math.min(w,h) * 0.5, colors: ['rgba(40,20,80,0.10)','rgba(20,40,90,0.07)','rgba(60,10,70,0.05)'] },
+                    { x: w * 0.75, y: h * 0.7, r: Math.min(w,h) * 0.45, colors: ['rgba(10,40,70,0.09)','rgba(30,20,60,0.06)','rgba(50,30,80,0.04)'] },
+                    { x: w * 0.5,  y: h * 0.15,r: Math.min(w,h) * 0.35, colors: ['rgba(20,50,90,0.06)','rgba(40,20,70,0.04)'] }
+                ];
+            }
+            draw(ctx) {
+                for (const n of this.centers) {
+                    for (const c of n.colors) {
+                        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+                        g.addColorStop(0, c);
+                        g.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.fillStyle = g;
+                        ctx.globalAlpha = 1;
+                        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    }
+                }
+            }
+        }
+
+        // ── Main ────────────────────────────────────────────────────
+        const canvas = document.getElementById('starfield');
+        const ctx    = canvas.getContext('2d');
+        let W = 0, H = 0;
+
+        function resize() {
+            W = canvas.width  = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            initStars();
+            nebula = new Nebula(W, H);
+        }
+        window.addEventListener('resize', resize);
+
+        const STARS_PER_LAYER = [140, 100, 70]; // slow, mid, fast
+        const stars = [];
+        let nebula = null;
+
+        function initStars() {
+            stars.length = 0;
+            for (let layer = 0; layer < 3; layer++) {
+                for (let i = 0; i < STARS_PER_LAYER[layer]; i++) {
+                    stars.push(new Star(
+                        Math.random() * W,
+                        Math.random() * H,
+                        layer
+                    ));
+                }
+            }
+        }
+
+        let last = performance.now();
+        function loop(now) {
+            const dt = Math.min(50, now - last);
+            last = now;
+
+            // background
+            ctx.fillStyle = '#050510';
+            ctx.globalAlpha = 1;
+            ctx.fillRect(0, 0, W, H);
+
+            // nebula behind stars
+            if (nebula) nebula.draw(ctx);
+
+            // stars
+            for (const s of stars) {
+                s.update(dt, W, H);
+                s.draw(ctx);
+            }
+            ctx.globalAlpha = 1;
+
+            requestAnimationFrame(loop);
+        }
+
+        resize();          // sets W/H, inits stars + nebula
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
