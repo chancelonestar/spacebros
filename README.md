@@ -1,14 +1,14 @@
 # SpaceBros
 
-A single-file asteroids-style game — no frameworks, no dependencies, just an HTML file and a canvas. Open it in any browser and fly.
+> Two-player asteroids. Blue vs green. WASD vs arrows. Same asteroid field.
 
 ![SpaceBros screenshot](https://raw.githubusercontent.com/chancelonestar/spacebros/master/screenshot.png)
 
 ## Play
 
-Open `ship.html` in your browser. That's it — no install, no build step, no server needed. Works offline.
+Open `ship.html` in your browser. No install, no build step, no server — works offline.
 
-Or run it from the command line if you want to feel like you're back in 1999:
+Or fullscreen it for maximum intensity:
 
 ```bash
 chromium --kiosk file:///path/to/spacebros/ship.html
@@ -16,32 +16,52 @@ chromium --kiosk file:///path/to/spacebros/ship.html
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| `← →` | Rotate |
-| `↑` | Thrust |
-| `↓` | Brake |
-| `Space` or click | Fire laser |
+| | Player 1 (Blue) | Player 2 (Green) |
+|--|------------------|-------------------|
+| Rotate left | `A` | `←` |
+| Rotate right | `D` | `→` |
+| Thrust | `W` | `↑` |
+| Brake | `S` | `↓` |
+| Fire | `Space` | Left mouse click |
+
+Both players share one keyboard. P2 also fires with a left-click on the canvas.
 
 ## Features
 
-- **Starfield** — multi-layer parallax with twinkling stars and nebula washes
-- **Asteroids** — irregular polygons wandering in from the edges, spinning on their own rhythm
-- **Ship** — you fly it, you shoot it, you try not to let it die
-- **Energy shield** — hits cost 20 energy; at zero the ship explodes
-- **Score** — 100 points per asteroid vaporized
-- **Game over → Play Again** — the loop continues
+- **Two ships** — blue P1 spawns left-third, green P2 spawns right-third. Each has its own energy, score, and lasers.
+- **Shared asteroid field** — both players shoot the same rocks. Laser hits credit the ship that fired (+100 score).
+- **Energy shield** — 100 per ship. Asteroid collision costs 20. Ship explodes at 0.
+- **Single death** — a destroyed ship is defeated; the other keeps playing until they're down too.
+- **Game over** — when both ships are destroyed: P1 final score, P2 final score, combined total, and a PLAY AGAIN button.
+- **Starfield** — three parallax layers of twinkling stars with nebula washes.
+- **Slow asteroids** — slow drift, slow spin, organic wobble (built for shared-keyboard play, not speed-running).
 
-## Project files
+## Version History
+
+### v0.0.1 — Single Player
+- One ship, one laser, one energy bar, one score
+- Starfield, asteroids, ship with lasers, energy shield, game over/restart
+- [Commit f97d794](https://github.com/chancelonestar/spacebros/commit/f97d794)
+
+### v0.0.2 — Two Player
+- Two ships: blue P1 (left-third) and green P2 (right-third)
+- P1 controls: WASD + Space. P2 controls: Arrow keys + Left mouse click
+- Each ship has its own energy bar and score (P1 top-left, P2 top-right)
+- Shared asteroid field — both shoot the same rocks
+- Ship-asteroid collision damages only the ship that collided
+- Game over when both are destroyed — P1 final, P2 final, combined score, PLAY AGAIN
+- [Commit 8c03516](https://github.com/chancelonestar/spacebros/commit/8c03516)
+
+## Project Files
 
 | File | What it is |
 |------|------------|
-| `ship.html` | The full game — open this one |
-| `starfield.html` | Just the starfield (standalone demo) |
+| `ship.html` | The game — open this one |
+| `starfield.html` | Standalone starfield demo |
 
-## Built with
+## Built With
 
-Vanilla HTML5 Canvas + JavaScript. No libraries, no build tools, no npm. Just code and a browser.
+Vanilla HTML5 Canvas + JavaScript. No frameworks, no dependencies, no build step.
 
 ## License
 
