@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; overflow: hidden; background: #050510; font-family: monospace; }
-        canvas { display: block; position: fixed; top: 0; left: 0; cursor: crosshair; }
+        canvas { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; cursor: crosshair; }
         #hud { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
         .player-hud { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; }
         #p1-hud { top: 12px; left: 12px; }
@@ -72,8 +72,10 @@ const ctx    = canvas.getContext('2d');
 let W = 0, H = 0;
 
 function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    W = canvas.width  = window.innerWidth || window.screen.width || 1280;
+    H = canvas.height = window.innerHeight || window.screen.height || 720;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
     initStars();
     initNebulae();
 }
@@ -284,6 +286,7 @@ class Ship {
     }
 
     update(dt, keys) {
+        this.keys = keys;
         if (this.exploded) {
             const now = performance.now();
             for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -295,10 +298,10 @@ class Ship {
             }
             return;
         }
-        if (keys.right) this.angle += 0.0045 * dt;
-        if (keys.left)  this.angle -= 0.0045 * dt;
-        if (keys.up)    { const fwdX = Math.sin(this.angle), fwdY = -Math.cos(this.angle); this.vx += fwdX * this.thrust * dt; this.vy += fwdY * this.thrust * dt; }
-        if (keys.down)  { this.vx -= Math.sin(this.angle) * this.brake * dt;  this.vy += Math.cos(this.angle) * this.brake * dt; }
+        if (this.keys.right) this.angle += 0.0045 * dt;
+        if (this.keys.left)  this.angle -= 0.0045 * dt;
+        if (this.keys.up)    { const fwdX = Math.sin(this.angle), fwdY = -Math.cos(this.angle); this.vx += fwdX * this.thrust * dt; this.vy += fwdY * this.thrust * dt; }
+        if (this.keys.down)  { this.vx -= Math.sin(this.angle) * this.brake * dt;  this.vy += Math.cos(this.angle) * this.brake * dt; }
         this.vx *= this.friction; this.vy *= this.friction;
         const spd = Math.hypot(this.vx, this.vy);
         if (spd > this.maxSpeed) { this.vx = (this.vx/spd)*this.maxSpeed; this.vy = (this.vy/spd)*this.maxSpeed; }
@@ -325,7 +328,7 @@ class Ship {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        if (keys.up) {
+        if (this.keys.up) {
             const flick = 3 + Math.random() * 4;
             ctx.beginPath();
             ctx.moveTo(-4, 8); ctx.lineTo(-2, 8+flick); ctx.lineTo(0, 8+flick+2);
@@ -403,31 +406,40 @@ class Laser {
 }
 
 // ---- INPUT ----
-const keys = { left:false, right:false, up:false, down:false };
-let lastFire1 = 0, lastFire2 = 0;
+const keysP1 = { up:false, down:false, left:false, right:false };
+const keysP2 = { up:false, down:false, left:false, right:false };
 const lasers = [];
 
 function fireLaser(ship, now) {
     if (ship.exploded) return;
-    if (now - (ship === ship1 ? lastFire1 : lastFire2) < LASER_COOLDOWN) return;
-    if (ship === ship1) lastFire1 = now; else lastFire2 = now;
+    const last = ship.lastFire == null ? 0 : ship.lastFire;
+    if (now - last < LASER_COOLDOWN) return;
+    ship.lastFire = now;
     lasers.push(new Laser(ship.x, ship.y, ship.angle, ship.laserColor, ship, now));
 }
 
 document.addEventListener('keydown', e => {
     const k = e.key;
-    if (k === 'ArrowLeft' || k === 'a' || k === 'A') { keys.left = true; e.preventDefault(); }
-    else if (k === 'ArrowRight' || k === 'd' || k === 'D') { keys.right = true; e.preventDefault(); }
-    else if (k === 'ArrowUp' || k === 'w' || k === 'W') { keys.up = true; e.preventDefault(); }
-    else if (k === 'ArrowDown' || k === 's' || k === 'S') { keys.down = true; e.preventDefault(); }
+    if (k === 'a' || k === 'A') { keysP1.left = true; e.preventDefault(); }
+    else if (k === 'd' || k === 'D') { keysP1.right = true; e.preventDefault(); }
+    else if (k === 'w' || k === 'W') { keysP1.up = true; e.preventDefault(); }
+    else if (k === 's' || k === 'S') { keysP1.down = true; e.preventDefault(); }
+    else if (k === 'ArrowLeft') { keysP2.left = true; e.preventDefault(); }
+    else if (k === 'ArrowRight') { keysP2.right = true; e.preventDefault(); }
+    else if (k === 'ArrowUp') { keysP2.up = true; e.preventDefault(); }
+    else if (k === 'ArrowDown') { keysP2.down = true; e.preventDefault(); }
     if (k === ' ' || e.code === 'Space') { e.preventDefault(); if (ship1.alive) fireLaser(ship1, performance.now()); }
 });
 document.addEventListener('keyup', e => {
     const k = e.key;
-    if (k === 'ArrowLeft' || k === 'a' || k === 'A') keys.left = false;
-    else if (k === 'ArrowRight' || k === 'd' || k === 'D') keys.right = false;
-    else if (k === 'ArrowUp' || k === 'w' || k === 'W') keys.up = false;
-    else if (k === 'ArrowDown' || k === 's' || k === 'S') keys.down = false;
+    if (k === 'a' || k === 'A') keysP1.left = false;
+    else if (k === 'd' || k === 'D') keysP1.right = false;
+    else if (k === 'w' || k === 'W') keysP1.up = false;
+    else if (k === 's' || k === 'S') keysP1.down = false;
+    else if (k === 'ArrowLeft') keysP2.left = false;
+    else if (k === 'ArrowRight') keysP2.right = false;
+    else if (k === 'ArrowUp') keysP2.up = false;
+    else if (k === 'ArrowDown') keysP2.down = false;
 });
 canvas.addEventListener('mousedown', e => {
     if (e.button === 0 && ship2.alive) { e.preventDefault(); fireLaser(ship2, performance.now()); }
@@ -444,7 +456,6 @@ const MAX_ENERGY = 100;
 function resetGame() {
     score1 = 0; score2 = 0;
     lasers.length = 0;
-    lastFire1 = 0; lastFire2 = 0;
     ship1 = new Ship(W * 0.25, H * 0.75, '#aad0ff', '#88ddff',
         document.getElementById('p1-score'), document.getElementById('p1-bar'),
         document.getElementById('p1-defeated'), 'P1');
@@ -485,8 +496,8 @@ function loop(now) {
 
     for (const a of asteroids) { a.update(dt); a.draw(); }
 
-    ship1.update(dt, keys); ship1.draw();
-    ship2.update(dt, keys); ship2.draw();
+    ship1.update(dt, keysP1); ship1.draw();
+    ship2.update(dt, keysP2); ship2.draw();
 
     // lasers
     for (let i = lasers.length - 1; i >= 0; i--) {
