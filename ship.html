@@ -219,10 +219,49 @@ class Asteroid {
     }
 }
 const asteroids = [];
+const regenCapsules = [];
+
+class RegenCapsule {
+    constructor() { this.spawnOnScreen(); }
+    spawnOnScreen() {
+        this.x = 100 + Math.random() * (W - 200);
+        this.y = 120 + Math.random() * (H - 300);
+        this.radius = 10;
+        this.vx = 0; this.vy = 0;
+        this.alive = true;
+        this.bobPhase = Math.random() * Math.PI * 2;
+        this.color = '#66ff66';
+        this.glowColor = 'rgba(102,255,102,0.6)';
+    }
+    update(dt) {
+        this.y += Math.sin(performance.now() * 0.004 + this.bobPhase) * 0.08 * dt;
+        this.x += this.vx * dt; this.y += this.vy * dt;
+    }
+    draw() {
+        if (!this.alive) return;
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = this.glowColor;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 6, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = this.color; ctx.shadowBlur = 10;
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+    }
+}
+
 function initAsteroids() {
     const count = 14 + Math.floor(Math.random() * 6);
     for (let i = asteroids.length; i < count; i++) asteroids.push(new Asteroid());
+    const capCount = Math.max(1, Math.floor(count / 10));
+    for (let i = regenCapsules.length; i < capCount; i++) regenCapsules.push(new RegenCapsule());
+    //regenCapsules.push(new RegenCapsule()); // 1 at game start
     while (asteroids.length > count) asteroids.pop();
+    while (regenCapsules.length > capCount + 1) regenCapsules.pop();
 }
 
 // ---- SHIP ----
@@ -453,9 +492,13 @@ document.getElementById('play-again').addEventListener('click', () => {
 let ship1, ship2;
 const MAX_ENERGY = 100;
 
+let lastRegenSpawn = 0;
 function resetGame() {
     score1 = 0; score2 = 0;
     lasers.length = 0;
+    regenCapsules.length = 0;
+    regenCapsules.push(new RegenCapsule()); // 1 capsule at start
+    lastRegenSpawn = performance.now();
     ship1 = new Ship(W * 0.25, H * 0.75, '#aad0ff', '#88ddff',
         document.getElementById('p1-score'), document.getElementById('p1-bar'),
         document.getElementById('p1-defeated'), 'P1');
@@ -489,12 +532,21 @@ function loop(now) {
     const dt = Math.min(32, now - (lastT || now));
     lastT = now;
 
+    // spawn 2 regen capsules every 60 seconds
+    if (lastRegenSpawn === 0) lastRegenSpawn = performance.now();
+    if (performance.now() - lastRegenSpawn >= 60000) {
+        lastRegenSpawn = performance.now();
+        regenCapsules.push(new RegenCapsule());
+        regenCapsules.push(new RegenCapsule());
+    }
+
     ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, W, H);
     drawNebulae();
 
     for (const s of stars) { s.update(dt); s.draw(); }
 
     for (const a of asteroids) { a.update(dt); a.draw(); }
+    for (const c of regenCapsules) { c.update(dt); c.draw(); }
 
     ship1.update(dt, keysP1); ship1.draw();
     ship2.update(dt, keysP2); ship2.draw();
@@ -533,6 +585,20 @@ function loop(now) {
                 break;
             }
         }
+        for (let i = regenCapsules.length - 1; i >= 0; i--) {
+            const c = regenCapsules[i];
+            if (!c.alive) continue;
+            if (Math.hypot(ship1.x - c.x, ship1.y - c.y) < ship1.radius + c.radius) {
+                ship1.energy = Math.min(ship1.maxEnergy, ship1.energy + 15);
+                updateBar(ship1);
+                c.alive = false;
+                for (let j = 0; j < 8; j++) {
+                    const a = Math.random() * Math.PI * 2;
+                    ship1.particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * (0.5+Math.random()), vy: Math.sin(a) * (0.5+Math.random()), life: 300, born: performance.now(), size: 2, color: '#66ff66' });
+                }
+                break;
+            }
+        }
     }
     if (ship2.alive) {
         for (let i = asteroids.length - 1; i >= 0; i--) {
@@ -545,10 +611,29 @@ function loop(now) {
                 break;
             }
         }
+        for (let i = regenCapsules.length - 1; i >= 0; i--) {
+            const c = regenCapsules[i];
+            if (!c.alive) continue;
+            if (Math.hypot(ship2.x - c.x, ship2.y - c.y) < ship2.radius + c.radius) {
+                ship2.energy = Math.min(ship2.maxEnergy, ship2.energy + 15);
+                updateBar(ship2);
+                c.alive = false;
+                for (let j = 0; j < 8; j++) {
+                    const a = Math.random() * Math.PI * 2;
+                    ship2.particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * (0.5+Math.random()), vy: Math.sin(a) * (0.5+Math.random()), life: 300, born: performance.now(), size: 2, color: '#66ff66' });
+                }
+                break;
+            }
+        }
     }
 
     // update bars even when nothing changes (cheap)
     updateBar(ship1); updateBar(ship2);
+    // clean up energy capsules swallowed (shouldn't be needed since takeDamage pops them, but be safe)
+    for (let i = regenCapsules.length - 1; i >= 0; i--) {
+        const c = regenCapsules[i];
+        if (!c.alive) regenCapsules.splice(i, 1);
+    }
     requestAnimationFrame(loop);
 }
 
